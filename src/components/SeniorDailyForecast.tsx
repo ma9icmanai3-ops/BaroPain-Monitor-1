@@ -21,14 +21,23 @@ import {
   Thermometer,
 } from 'lucide-react';
 import { DailyForecastItem } from '../types';
+import { VoiceForecastButton } from './VoiceForecastButton';
 
 interface SeniorDailyForecastProps {
   forecast: DailyForecastItem[];
   isLargeText: boolean;
   embedded?: boolean;
+  onSpeakForecast?: () => void;
+  isSpeaking?: boolean;
 }
 
-export const SeniorDailyForecast: React.FC<SeniorDailyForecastProps> = ({ forecast, isLargeText, embedded = false }) => {
+export const SeniorDailyForecast: React.FC<SeniorDailyForecastProps> = ({
+  forecast,
+  isLargeText,
+  embedded = false,
+  onSpeakForecast,
+  isSpeaking = false,
+}) => {
   const [selectedDayIndex, setSelectedDayIndex] = useState<number>(0);
 
   if (!forecast || forecast.length === 0) {
@@ -94,27 +103,37 @@ export const SeniorDailyForecast: React.FC<SeniorDailyForecastProps> = ({ foreca
               </div>
             </div>
 
-            {/* Compact Ache Score Badge */}
-            <div className="flex items-center gap-2.5 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200 shadow-sm self-start sm:self-auto shrink-0">
-              <div className="text-right">
-                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                  Today's Ache Risk
+            {/* Compact Ache Score Badge + Voice Button */}
+            <div className="flex items-center gap-2.5 self-start sm:self-auto shrink-0 flex-wrap sm:flex-nowrap">
+              {onSpeakForecast && (
+                <VoiceForecastButton
+                  onSpeak={onSpeakForecast}
+                  isSpeaking={isSpeaking}
+                  compact={true}
+                />
+              )}
+
+              <div className="flex items-center gap-2.5 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200 shadow-sm">
+                <div className="text-right">
+                  <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                    Today's Ache Risk
+                  </div>
+                  <div className="text-sm sm:text-base font-extrabold text-slate-900">
+                    {todayForecast.painHeadline}
+                  </div>
                 </div>
-                <div className="text-sm sm:text-base font-extrabold text-slate-900">
-                  {todayForecast.painHeadline}
+                <div
+                  className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-white text-base shadow-sm ${
+                    todayForecast.predictedRiskLevel === 'high'
+                      ? 'bg-rose-600'
+                      : todayForecast.predictedRiskLevel === 'moderate'
+                      ? 'bg-amber-500'
+                      : 'bg-emerald-600'
+                  }`}
+                >
+                  <span>{todayForecast.predictedPainScore}</span>
+                  <span className="text-[9px] font-normal opacity-80 ml-0.5">/10</span>
                 </div>
-              </div>
-              <div
-                className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-white text-base shadow-sm ${
-                  todayForecast.predictedRiskLevel === 'high'
-                    ? 'bg-rose-600'
-                    : todayForecast.predictedRiskLevel === 'moderate'
-                    ? 'bg-amber-500'
-                    : 'bg-emerald-600'
-                }`}
-              >
-                <span>{todayForecast.predictedPainScore}</span>
-                <span className="text-[9px] font-normal opacity-80 ml-0.5">/10</span>
               </div>
             </div>
           </div>

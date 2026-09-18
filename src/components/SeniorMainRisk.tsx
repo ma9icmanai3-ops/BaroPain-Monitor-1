@@ -101,43 +101,35 @@ export const SeniorMainRisk: React.FC<SeniorMainRiskProps> = ({
       </div>
 
       {/* Primary Traffic-Light Pain Status Card */}
-      <div className={`rounded-2xl border-3 p-5 sm:p-6 flex flex-col sm:flex-row items-start sm:items-center gap-5 shadow-sm ${bannerBg}`}>
-        {icon}
-        <div className="space-y-1.5 flex-1">
-          <div className="flex items-center gap-3 flex-wrap">
-            <span className={`px-3 py-1 rounded-lg text-sm font-extrabold uppercase tracking-wider ${badgeBg}`}>
-              {title}
-            </span>
-            <span className="text-slate-700 font-bold text-base">
-              Ache Level: {acheScoreOutOfTen} out of 10
-            </span>
-          </div>
+      <div className={`rounded-2xl border-3 p-5 sm:p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5 shadow-sm ${bannerBg}`}>
+        <div className="flex items-start sm:items-center gap-4 flex-1">
+          {icon}
+          <div className="space-y-1.5 flex-1">
+            <div className="flex items-center gap-3 flex-wrap">
+              <span className={`px-3 py-1 rounded-lg text-sm font-extrabold uppercase tracking-wider ${badgeBg}`}>
+                {title}
+              </span>
+              <span className="text-slate-700 font-bold text-base">
+                Ache Level: {acheScoreOutOfTen} out of 10
+              </span>
+            </div>
 
-          <p className={`font-medium leading-relaxed ${isLargeText ? 'text-xl text-slate-900' : 'text-lg text-slate-800'}`}>
-            {message}
-          </p>
-        </div>
-      </div>
-
-      {/* Voice Assistant Callout */}
-      {onSpeakForecast && (
-        <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-sky-50 border-2 border-emerald-300/80 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-sm">
-          <div className="text-left">
-            <h4 className="text-base font-bold text-slate-900 flex items-center gap-2">
-              <span>🎙️ Spoken Daily Forecast</span>
-            </h4>
-            <p className="text-sm text-slate-600 mt-0.5">
-              Listen to today's barometric pressure trend, pain risk, and comfort advice spoken aloud.
+            <p className={`font-medium leading-relaxed ${isLargeText ? 'text-xl text-slate-900' : 'text-lg text-slate-800'}`}>
+              {message}
             </p>
           </div>
-          <div className="w-full sm:w-auto shrink-0">
+        </div>
+
+        {/* Prominent Voice Speaker Button embedded inside Today's Risk Card */}
+        {onSpeakForecast && (
+          <div className="w-full sm:w-auto shrink-0 flex sm:flex-col items-center justify-end">
             <VoiceForecastButton
               onSpeak={onSpeakForecast}
               isSpeaking={isSpeaking}
             />
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* 7-Day Forecast & Pain Predictions (Right under Good Day for Your Joints) */}
       {weather.forecastDays && weather.forecastDays.length > 0 && (
@@ -145,6 +137,8 @@ export const SeniorMainRisk: React.FC<SeniorMainRiskProps> = ({
           forecast={weather.forecastDays}
           isLargeText={isLargeText}
           embedded
+          onSpeakForecast={onSpeakForecast}
+          isSpeaking={isSpeaking}
         />
       )}
 
