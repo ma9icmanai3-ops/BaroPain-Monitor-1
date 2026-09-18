@@ -453,6 +453,96 @@ app.get('/api/geocode', async (req: Request, res: Response) => {
   }
 });
 
+// Helper for breaking text into clean natural speech chunks
+function splitTextForTts(text: string, maxLen = 160): string[] {
+  const clean = text
+    .replace(/[\u{1F600}-\u{1F6FF}|\u{2600}-\u{26FF}]/gu, '')
+    .replace(/[•–—]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  const sentences = clean.split(/(?<=[.!?;,])\s+/);
+  const chunks: string[] = [];
+  let cur = '';
+
+  for (const s of sentences) {
+    if (!s) continue;
+    if ((cur + ' ' + s).trim().length <= maxLen) {
+      cur = (cur + ' ' + s).trim();
+    } else {
+      if (cur) chunks.push(cur);
+      if (s.length > maxLen) {
+        const words = s.split(' ');
+        let wcur = '';
+        for (const w of words) {
+          if ((wcur + ' ' + w).trim().length <= maxLen) {
+            wcur = (wcur + ' ' + w).trim();
+          } else {
+            if (wcur) chunks.push(wcur);
+            wcur = w;
+          }
+        }
+        if (wcur) cur = wcur;
+        else cur = '';
+      } else {
+        cur = s;
+      }
+    }
+  }
+  if (cur) chunks.push(cur);
+  return chunks.length > 0 ? chunks : [clean.slice(0, maxLen)];
+}
+
+// API 4.5: High-reliability Server-side Text-to-Speech audio streaming
+app.all('/api/tts', async (req: Request, res: Response) => {
+  try {
+    const rawText = (req.method === 'POST' ? req.body?.text : req.query?.text) as string;
+    const text = (rawText || '').trim();
+
+    if (!text) {
+      return res.status(400).json({ error: 'Text query or body parameter is required' });
+    }
+
+    const chunks = splitTextForTts(text, 160);
+    const audioBuffers: Buffer[] = [];
+
+    for (const chunk of chunks) {
+      try {
+        const googleTtsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(
+          chunk
+        )}&tl=en&client=tw-ob`;
+        const ttsRes = await fetch(googleTtsUrl, {
+          headers: {
+            'User-Agent':
+              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          },
+        });
+
+        if (ttsRes.ok) {
+          const ab = await ttsRes.arrayBuffer();
+          audioBuffers.push(Buffer.from(ab));
+        }
+      } catch (chunkErr) {
+        console.warn('[TTS] Failed to fetch chunk:', chunkErr);
+      }
+    }
+
+    if (audioBuffers.length === 0) {
+      return res.status(502).json({ error: 'Could not generate audio stream' });
+    }
+
+    const fullAudio = Buffer.concat(audioBuffers);
+    res.setHeader('Content-Type', 'audio/mpeg');
+    res.setHeader('Content-Length', fullAudio.length);
+    res.setHeader('Accept-Ranges', 'bytes');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    return res.send(fullAudio);
+  } catch (error: any) {
+    console.error('TTS endpoint error:', error);
+    res.status(500).json({ error: 'TTS audio synthesis failed: ' + (error?.message || 'Server error') });
+  }
+});
+
 // API 5: Gemini AI Correlation Analysis
 app.post('/api/gemini/analyze-correlation', async (req: Request, res: Response) => {
   try {

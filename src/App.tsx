@@ -40,10 +40,14 @@ export default function App() {
   });
 
   const [isSpeaking, setIsSpeaking] = useState<boolean>(false);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    const unsub = voiceService.subscribe((speaking) => {
-      setIsSpeaking(speaking);
+    const unsub = voiceService.subscribe((state) => {
+      setIsSpeaking(state.isSpeaking);
+      if (state.audioUrl) {
+        setAudioUrl(state.audioUrl);
+      }
     });
     return () => {
       unsub();
@@ -88,7 +92,7 @@ export default function App() {
       const scores = PainCalculator.calculateGranularPain(data);
       setPainScores(scores);
 
-      // Speak daily forecast on load
+      // Prepare daily spoken forecast on load
       if (!isBackground) {
         voiceService.readForecastOnLoad(loc.name, data, scores);
       }
@@ -296,6 +300,8 @@ export default function App() {
               onPlayForecast={handleSpeakForecast}
               onStopForecast={() => voiceService.stop()}
               locationName={currentLocation.name}
+              audioUrl={audioUrl}
+              forecastScript={voiceService.generateForecastText(currentLocation.name, weather, painScores)}
             />
 
             {/* 1. Main Traffic-Light Status: Today's Overall Ache Risk */}
