@@ -132,15 +132,20 @@ class VoiceService {
         // Play gentle audio chime to confirm sound output is working immediately on user click
         this.playActivationChime();
 
-        // Cancel any currently playing speech
-        this.stop();
+        // 1. Cancel previous speech
+        try {
+          window.speechSynthesis.cancel();
+        } catch {}
+        this.clearUtterance();
 
-        // Browser quirk: ensure voices are populated
-        const voices = window.speechSynthesis.getVoices();
-        const voice = this.getBestVoice();
+        // Clean text of non-standard symbols or special dashes
+        const cleanText = text
+          .replace(/[•–—]/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim();
 
-        // Break long speech into natural, clean sentences to prevent Chromium/Webkit utterance drop bugs
-        const sentences = text
+        // Break text into digestible sentences
+        const sentences = cleanText
           .split(/(?<=[.?!])\s+/)
           .map((s) => s.trim())
           .filter(Boolean);
@@ -155,47 +160,58 @@ class VoiceService {
         this.hasSpoken = true;
         this.notify();
 
+        let resumeTimer: any = null;
+
+        const cleanup = (success: boolean) => {
+          if (resumeTimer) clearInterval(resumeTimer);
+          this.isSpeaking = false;
+          this.clearUtterance();
+          this.notify();
+          if (onEnd) onEnd();
+          resolve(success);
+        };
+
         const speakNextSentence = () => {
           if (!this.isSpeaking || currentIndex >= sentences.length) {
-            this.isSpeaking = false;
-            this.clearUtterance();
-            this.notify();
-            if (onEnd) onEnd();
-            resolve(true);
+            cleanup(true);
             return;
           }
 
-          const currentSentence = sentences[currentIndex];
+          const sentence = sentences[currentIndex];
           currentIndex++;
 
-          const utterance = new SpeechSynthesisUtterance(currentSentence);
+          const utterance = new SpeechSynthesisUtterance(sentence);
+          const voices = window.speechSynthesis.getVoices();
+          const voice = this.getBestVoice();
+
           if (voice) {
             utterance.voice = voice;
           } else if (voices && voices.length > 0) {
-            utterance.voice = voices[0];
+            const enVoice = voices.find((v) => v.lang.toLowerCase().startsWith('en')) || voices[0];
+            utterance.voice = enVoice;
           }
 
-          // Natural, clear pacing suitable for seniors & daily advisories
           utterance.rate = 0.95;
           utterance.pitch = 1.0;
           utterance.volume = 1.0;
 
           utterance.onend = () => {
-            // Small pause between sentences for realistic conversational pace
-            setTimeout(speakNextSentence, 60);
+            if (this.isSpeaking) {
+              setTimeout(speakNextSentence, 80);
+            }
           };
 
           utterance.onerror = (event: any) => {
-            console.warn('[VoiceService] Sentence error:', event);
-            if (event.error === 'canceled' || event.error === 'interrupted') {
-              this.isSpeaking = false;
-              this.clearUtterance();
-              this.notify();
-              resolve(false);
+            const errType = event?.error || 'error';
+            console.warn('[VoiceService] Speech error:', errType);
+            if (errType === 'canceled' || errType === 'interrupted') {
+              cleanup(false);
               return;
             }
-            // If one sentence has an issue, attempt next sentence
-            setTimeout(speakNextSentence, 60);
+            // If one sentence fails in the webview, attempt the next sentence
+            if (this.isSpeaking) {
+              setTimeout(speakNextSentence, 80);
+            }
           };
 
           this.retainUtterance(utterance);
@@ -204,32 +220,37 @@ class VoiceService {
             window.speechSynthesis.resume();
           }
 
-          window.speechSynthesis.speak(utterance);
+          try {
+            window.speechSynthesis.speak(utterance);
+          } catch (speakErr) {
+            console.error('[VoiceService] speak error:', speakErr);
+            cleanup(false);
+          }
         };
 
-        // Immediate cancel and unpause kick
-        window.speechSynthesis.cancel();
-        if (window.speechSynthesis.paused) {
-          window.speechSynthesis.resume();
-        }
-
+        // Important: in Chromium/Safari, calling speak() immediately (<100ms) after cancel()
+        // causes the browser to instantly fire SpeechSynthesisErrorEvent with error: "canceled".
+        // A 180ms delay guarantees the cancel cycle finishes before queuing the new utterance.
         setTimeout(() => {
-          speakNextSentence();
-        }, 30);
-
-        // Periodic resume kick to prevent Chrome from freezing
-        const resumeInterval = setInterval(() => {
-          if (!this.isSpeaking) {
-            clearInterval(resumeInterval);
-            return;
-          }
           if (window.speechSynthesis.paused) {
             window.speechSynthesis.resume();
           }
-        }, 1200);
+          speakNextSentence();
+
+          resumeTimer = setInterval(() => {
+            if (!this.isSpeaking) {
+              clearInterval(resumeTimer);
+              return;
+            }
+            if (window.speechSynthesis.paused) {
+              window.speechSynthesis.resume();
+            }
+          }, 1500);
+        }, 180);
       } catch (err) {
         console.error('[VoiceService] speak error:', err);
         this.isSpeaking = false;
+        this.clearUtterance();
         this.notify();
         resolve(false);
       }
