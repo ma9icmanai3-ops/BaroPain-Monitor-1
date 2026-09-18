@@ -53,6 +53,17 @@ class VoiceService {
     this.listeners.forEach((listener) => listener(this.isSpeaking));
   }
 
+  // Retain utterance globally to avoid Chrome garbage collection cancellation bug
+  private retainUtterance(u: SpeechSynthesisUtterance) {
+    this.currentUtterance = u;
+    (window as any).__currentUtterance = u;
+  }
+
+  private clearUtterance() {
+    this.currentUtterance = null;
+    (window as any).__currentUtterance = null;
+  }
+
   private getBestVoice(): SpeechSynthesisVoice | null {
     if (!this.isSupported()) return null;
     const voices = window.speechSynthesis.getVoices();
@@ -79,7 +90,7 @@ class VoiceService {
       window.speechSynthesis.cancel();
     } catch {}
     this.isSpeaking = false;
-    this.currentUtterance = null;
+    this.clearUtterance();
     this.notify();
   }
 
@@ -113,7 +124,7 @@ class VoiceService {
 
         const finish = () => {
           this.isSpeaking = false;
-          this.currentUtterance = null;
+          this.clearUtterance();
           this.notify();
           if (onEnd) onEnd();
           resolve(true);
@@ -123,12 +134,12 @@ class VoiceService {
         utterance.onerror = (event) => {
           console.warn('[VoiceService] Speech synthesis event:', event);
           this.isSpeaking = false;
-          this.currentUtterance = null;
+          this.clearUtterance();
           this.notify();
           resolve(false);
         };
 
-        this.currentUtterance = utterance;
+        this.retainUtterance(utterance);
 
         // Resume in case speech synthesis was paused by browser
         if (window.speechSynthesis.paused) {
