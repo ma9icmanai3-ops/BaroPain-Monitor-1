@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Sun, MapPin, RefreshCw, Search, Navigation, ZoomIn, ZoomOut, Check } from 'lucide-react';
 import { LocationItem } from '../types';
+import { VoiceForecastButton } from './VoiceForecastButton';
 
 interface SeniorNavbarProps {
   currentLocation: string;
@@ -11,6 +12,8 @@ interface SeniorNavbarProps {
   isGpsActive: boolean;
   isLargeText: boolean;
   onToggleLargeText: () => void;
+  onSpeakForecast?: () => void;
+  isSpeaking?: boolean;
 }
 
 const POPULAR_TOWNS: LocationItem[] = [
@@ -33,6 +36,8 @@ export const SeniorNavbar: React.FC<SeniorNavbarProps> = ({
   isGpsActive,
   isLargeText,
   onToggleLargeText,
+  onSpeakForecast,
+  isSpeaking = false,
 }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -76,6 +81,15 @@ export const SeniorNavbar: React.FC<SeniorNavbarProps> = ({
 
           {/* Quick Action Controls for Seniors */}
           <div className="flex items-center gap-2.5 flex-wrap w-full md:w-auto justify-start md:justify-end">
+            {/* Talk Daily Forecast Button */}
+            {onSpeakForecast && (
+              <VoiceForecastButton
+                onSpeak={onSpeakForecast}
+                isSpeaking={isSpeaking}
+                compact={true}
+              />
+            )}
+
             {/* Current Town Pill & Change Button */}
             <button
               onClick={() => setIsModalOpen(true)}

@@ -2,6 +2,7 @@ import React from 'react';
 import { Sun, CloudRain, Wind, Thermometer, ShieldCheck, AlertTriangle, CheckCircle, Navigation } from 'lucide-react';
 import { WeatherMetrics, PainScores } from '../types';
 import { SeniorDailyForecast } from './SeniorDailyForecast';
+import { VoiceForecastButton } from './VoiceForecastButton';
 
 interface SeniorMainRiskProps {
   weather: WeatherMetrics;
@@ -10,6 +11,8 @@ interface SeniorMainRiskProps {
   locationName: string;
   isGpsActive: boolean;
   onDetectLocation: () => void;
+  onSpeakForecast?: () => void;
+  isSpeaking?: boolean;
 }
 
 export const SeniorMainRisk: React.FC<SeniorMainRiskProps> = ({
@@ -19,6 +22,8 @@ export const SeniorMainRisk: React.FC<SeniorMainRiskProps> = ({
   locationName,
   isGpsActive,
   onDetectLocation,
+  onSpeakForecast,
+  isSpeaking = false,
 }) => {
   // If Today's forecast is available, synchronize the primary risk display directly with Today's calculated score
   const todayForecast = weather.forecastDays && weather.forecastDays.length > 0 ? weather.forecastDays[0] : null;
@@ -113,6 +118,26 @@ export const SeniorMainRisk: React.FC<SeniorMainRiskProps> = ({
           </p>
         </div>
       </div>
+
+      {/* Voice Assistant Callout */}
+      {onSpeakForecast && (
+        <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-sky-50 border-2 border-emerald-300/80 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-sm">
+          <div className="text-left">
+            <h4 className="text-base font-bold text-slate-900 flex items-center gap-2">
+              <span>🎙️ Spoken Daily Forecast</span>
+            </h4>
+            <p className="text-sm text-slate-600 mt-0.5">
+              Listen to today's barometric pressure trend, pain risk, and comfort advice spoken aloud.
+            </p>
+          </div>
+          <div className="w-full sm:w-auto shrink-0">
+            <VoiceForecastButton
+              onSpeak={onSpeakForecast}
+              isSpeaking={isSpeaking}
+            />
+          </div>
+        </div>
+      )}
 
       {/* 7-Day Forecast & Pain Predictions (Right under Good Day for Your Joints) */}
       {weather.forecastDays && weather.forecastDays.length > 0 && (

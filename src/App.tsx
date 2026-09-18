@@ -10,6 +10,8 @@ import { PainCalculator } from './services/painCalculator';
 import { DbHelper } from './services/dbHelper';
 import { WeatherMetrics, PainScores, PainLogEntry, LocationItem } from './types';
 import { Sun, AlertCircle, Loader2 } from 'lucide-react';
+import { voiceService } from './services/voiceService';
+import { VoiceAutoReadBanner } from './components/VoiceAutoReadBanner';
 
 const DEFAULT_LOCATION: LocationItem = {
   name: 'Seattle, WA',
@@ -38,6 +40,18 @@ export default function App() {
   const [isGpsActive, setIsGpsActive] = useState<boolean>(() => {
     return !!localStorage.getItem('user_real_location');
   });
+
+  const [isSpeaking, setIsSpeaking] = useState<boolean>(false);
+
+  useEffect(() => {
+    const unsub = voiceService.subscribe((speaking) => {
+      setIsSpeaking(speaking);
+    });
+    return () => {
+      unsub();
+      voiceService.stop();
+    };
+  }, []);
 
   const locRef = useRef<LocationItem>(currentLocation);
   locRef.current = currentLocation;
@@ -75,6 +89,11 @@ export default function App() {
 
       const scores = PainCalculator.calculateGranularPain(data);
       setPainScores(scores);
+
+      // Speak daily forecast on load
+      if (!isBackground) {
+        voiceService.readForecastOnLoad(loc.name, data, scores);
+      }
     } catch (err: any) {
       console.error('Failed to load weather data:', err);
       setError('Unable to load current weather. Please check your connection or try again.');
@@ -213,6 +232,15 @@ export default function App() {
     setLogs(DbHelper.getHistoryMatrix());
   };
 
+  const handleSpeakForecast = () => {
+    if (isSpeaking) {
+      voiceService.stop();
+    } else if (weather) {
+      const script = voiceService.generateForecastText(currentLocation.name, weather, painScores);
+      voiceService.speak(script);
+    }
+  };
+
   return (
     <div className={`min-h-screen bg-[#F4F7FB] text-slate-800 flex flex-col antialiased ${isLargeText ? 'text-lg' : 'text-base'}`}>
       {/* Top Friendly Header */}
@@ -225,6 +253,8 @@ export default function App() {
         isGpsActive={isGpsActive}
         isLargeText={isLargeText}
         onToggleLargeText={toggleLargeText}
+        onSpeakForecast={handleSpeakForecast}
+        isSpeaking={isSpeaking}
       />
 
       {/* Main Body */}
@@ -262,6 +292,14 @@ export default function App() {
 
         {weather && painScores && (
           <>
+            {/* Prominent Voice Auto-Read & Status Banner */}
+            <VoiceAutoReadBanner
+              isSpeaking={isSpeaking}
+              onPlayForecast={handleSpeakForecast}
+              onStopForecast={() => voiceService.stop()}
+              locationName={currentLocation.name}
+            />
+
             {/* 1. Main Traffic-Light Status: Today's Overall Ache Risk */}
             <SeniorMainRisk
               weather={weather}
@@ -270,6 +308,8 @@ export default function App() {
               locationName={currentLocation.name}
               isGpsActive={isGpsActive}
               onDetectLocation={handleDetectLocation}
+              onSpeakForecast={handleSpeakForecast}
+              isSpeaking={isSpeaking}
             />
 
             {/* 2. Three Common Body Areas: Knees/Joints, Head/Sinuses, Back/Neck */}
