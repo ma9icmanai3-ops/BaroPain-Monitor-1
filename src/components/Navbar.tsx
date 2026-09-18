@@ -104,6 +104,8 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <form onSubmit={handleSearch} className="flex gap-2 mb-3">
                   <div className="relative flex-1">
                     <input
+                      id="navbar-city-search"
+                      aria-label="Search city or zip code"
                       type="text"
                       placeholder="Search city or zip..."
                       value={searchQuery}

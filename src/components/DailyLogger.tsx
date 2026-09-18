@@ -83,6 +83,8 @@ export const DailyLogger: React.FC<DailyLoggerProps> = ({
 
         {/* Range Slider */}
         <input
+          id="perceived-pain-slider"
+          aria-label="Your Current Perceived Pain Level"
           type="range"
           min="1"
           max="10"
@@ -141,6 +143,8 @@ export const DailyLogger: React.FC<DailyLoggerProps> = ({
       {/* Optional Note input & Save button */}
       <div className="flex flex-col sm:flex-row gap-2 mt-3">
         <input
+          id="clinical-notes-input"
+          aria-label="Optional clinical notes"
           type="text"
           placeholder="Optional clinical notes (e.g. throbbing frontal sinus, swollen fingers)..."
           value={notes}

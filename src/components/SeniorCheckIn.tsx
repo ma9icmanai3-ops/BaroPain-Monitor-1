@@ -67,10 +67,10 @@ export const SeniorCheckIn: React.FC<SeniorCheckInProps> = ({
       </div>
 
       {/* 3 Giant Tap Targets for Seniors */}
-      <div>
-        <label className="block text-slate-800 font-bold text-lg mb-3">
+      <div role="group" aria-labelledby="joint-feeling-legend">
+        <div id="joint-feeling-legend" className="block text-slate-800 font-bold text-lg mb-3">
           How are your joints feeling right now?
-        </label>
+        </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {/* Feeling Good */}
           <button
