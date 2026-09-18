@@ -22,6 +22,10 @@ class VoiceService {
 
       // Add a one-time interaction listener to unlock audio if autoplay was blocked
       const unlockAudio = () => {
+        try {
+          // Warm up speech synthesis context
+          window.speechSynthesis.getVoices();
+        } catch {}
         if (this.pendingForecastText && !this.hasSpoken && !this.isSpeaking) {
           this.speak(this.pendingForecastText);
           this.pendingForecastText = null;
@@ -35,6 +39,29 @@ class VoiceService {
       window.addEventListener('keydown', unlockAudio, { passive: true });
       window.addEventListener('touchstart', unlockAudio, { passive: true });
     }
+  }
+
+  // Play a soft auditory chime indicating the voice engine is activated
+  private playActivationChime() {
+    try {
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioContextClass) return;
+      const ctx = new AudioContextClass();
+      if (ctx.state === 'suspended') {
+        ctx.resume();
+      }
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
+      osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.15); // A5
+      gain.gain.setValueAtTime(0.08, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.25);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.26);
+    } catch {}
   }
 
   public isSupported(): boolean {
@@ -102,58 +129,104 @@ class VoiceService {
       }
 
       try {
+        // Play gentle audio chime to confirm sound output is working immediately on user click
+        this.playActivationChime();
+
         // Cancel any currently playing speech
         this.stop();
 
-        const utterance = new SpeechSynthesisUtterance(text);
+        // Browser quirk: ensure voices are populated
+        const voices = window.speechSynthesis.getVoices();
         const voice = this.getBestVoice();
-        if (voice) {
-          utterance.voice = voice;
+
+        // Break long speech into natural, clean sentences to prevent Chromium/Webkit utterance drop bugs
+        const sentences = text
+          .split(/(?<=[.?!])\s+/)
+          .map((s) => s.trim())
+          .filter(Boolean);
+
+        if (sentences.length === 0) {
+          resolve(false);
+          return;
         }
 
-        // Natural, clear pacing suitable for seniors & daily advisories
-        utterance.rate = 0.92;
-        utterance.pitch = 1.0;
-        utterance.volume = 1.0;
+        let currentIndex = 0;
+        this.isSpeaking = true;
+        this.hasSpoken = true;
+        this.notify();
 
-        utterance.onstart = () => {
-          this.isSpeaking = true;
-          this.hasSpoken = true;
-          this.notify();
+        const speakNextSentence = () => {
+          if (!this.isSpeaking || currentIndex >= sentences.length) {
+            this.isSpeaking = false;
+            this.clearUtterance();
+            this.notify();
+            if (onEnd) onEnd();
+            resolve(true);
+            return;
+          }
+
+          const currentSentence = sentences[currentIndex];
+          currentIndex++;
+
+          const utterance = new SpeechSynthesisUtterance(currentSentence);
+          if (voice) {
+            utterance.voice = voice;
+          } else if (voices && voices.length > 0) {
+            utterance.voice = voices[0];
+          }
+
+          // Natural, clear pacing suitable for seniors & daily advisories
+          utterance.rate = 0.95;
+          utterance.pitch = 1.0;
+          utterance.volume = 1.0;
+
+          utterance.onend = () => {
+            // Small pause between sentences for realistic conversational pace
+            setTimeout(speakNextSentence, 60);
+          };
+
+          utterance.onerror = (event: any) => {
+            console.warn('[VoiceService] Sentence error:', event);
+            if (event.error === 'canceled' || event.error === 'interrupted') {
+              this.isSpeaking = false;
+              this.clearUtterance();
+              this.notify();
+              resolve(false);
+              return;
+            }
+            // If one sentence has an issue, attempt next sentence
+            setTimeout(speakNextSentence, 60);
+          };
+
+          this.retainUtterance(utterance);
+
+          if (window.speechSynthesis.paused) {
+            window.speechSynthesis.resume();
+          }
+
+          window.speechSynthesis.speak(utterance);
         };
 
-        const finish = () => {
-          this.isSpeaking = false;
-          this.clearUtterance();
-          this.notify();
-          if (onEnd) onEnd();
-          resolve(true);
-        };
-
-        utterance.onend = finish;
-        utterance.onerror = (event) => {
-          console.warn('[VoiceService] Speech synthesis event:', event);
-          this.isSpeaking = false;
-          this.clearUtterance();
-          this.notify();
-          resolve(false);
-        };
-
-        this.retainUtterance(utterance);
-
-        // Resume in case speech synthesis was paused by browser
+        // Immediate cancel and unpause kick
+        window.speechSynthesis.cancel();
         if (window.speechSynthesis.paused) {
           window.speechSynthesis.resume();
         }
 
-        window.speechSynthesis.speak(utterance);
-
-        // Workaround for Chrome bug where speech can pause after 15s or need a kick
         setTimeout(() => {
+          speakNextSentence();
+        }, 30);
+
+        // Periodic resume kick to prevent Chrome from freezing
+        const resumeInterval = setInterval(() => {
+          if (!this.isSpeaking) {
+            clearInterval(resumeInterval);
+            return;
+          }
           if (window.speechSynthesis.paused) {
             window.speechSynthesis.resume();
           }
-        }, 100);
+        }, 1200);
       } catch (err) {
         console.error('[VoiceService] speak error:', err);
         this.isSpeaking = false;
@@ -209,15 +282,11 @@ class VoiceService {
     const script = this.generateForecastText(locationName, weather, painScores);
     this.pendingForecastText = script;
 
-    if (!this.hasSpoken) {
-      // Attempt speak immediately (will work if browser permits autoplay)
-      this.speak(script).then((success) => {
-        if (!success) {
-          // If browser blocked autoplay, pendingForecastText remains ready for the first click/tap
-          this.pendingForecastText = script;
-        }
-      });
-    }
+    // Do NOT automatically trigger speech on load without user gesture, because
+    // modern browsers (Chrome, Edge, Safari, Roblox WebViews, iframes) block audio autoplay.
+    // When autoplay is blocked, the browser puts SpeechSynthesis into a frozen 'speaking' state
+    // where UI buttons show "Speaking" / "Stop Voice" while no audio actually plays!
+    // Instead, pendingForecastText stays ready so the user's first click immediately speaks aloud.
   }
 }
 
