@@ -6,11 +6,9 @@ import { SeniorBarometerExplainer } from './components/SeniorBarometerExplainer'
 import { SeniorCheckIn } from './components/SeniorCheckIn';
 import { SeniorAiDoctorTip } from './components/SeniorAiDoctorTip';
 import { SeniorAdvancedSection } from './components/SeniorAdvancedSection';
-import { PainCalculator } from './services/painCalculator';
-import { DbHelper } from './services/dbHelper';
+import { PainCalculator, DbHelper, voiceService } from './services';
 import { WeatherMetrics, PainScores, PainLogEntry, LocationItem } from './types';
-import { Sun, AlertCircle, Loader2 } from 'lucide-react';
-import { voiceService } from './services/voiceService';
+import { AlertCircle, Loader2 } from 'lucide-react';
 import { VoiceAutoReadBanner } from './components/VoiceAutoReadBanner';
 
 const DEFAULT_LOCATION: LocationItem = {

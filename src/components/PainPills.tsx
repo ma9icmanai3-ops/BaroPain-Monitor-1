@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { PainScores } from '../types';
-import { PainCalculator } from '../services/painCalculator';
+import { PainCalculator } from '../services';
 import { ChevronDown, ChevronUp, Brain, Bone, Activity, Sparkles } from 'lucide-react';
 
 interface PainPillsProps {

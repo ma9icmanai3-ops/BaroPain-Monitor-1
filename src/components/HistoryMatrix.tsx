@@ -1,8 +1,7 @@
 import React from 'react';
 import { Table, Trash2, Download, AlertTriangle, CheckCircle, Calendar } from 'lucide-react';
 import { PainLogEntry } from '../types';
-import { DbHelper } from '../services/dbHelper';
-import { PainCalculator } from '../services/painCalculator';
+import { DbHelper, PainCalculator } from '../services';
 
 interface HistoryMatrixProps {
   logs: PainLogEntry[];
